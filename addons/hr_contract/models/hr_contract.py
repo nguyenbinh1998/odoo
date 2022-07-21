@@ -101,6 +101,7 @@ class Contract(models.Model):
     @api.constrains('employee_id', 'state', 'kanban_state', 'date_start', 'date_end')
     def _check_current_contract(self):
         """ Two contracts in state [incoming | open | close] cannot overlap """
+
         for contract in self.filtered(lambda c: (c.state not in ['draft', 'cancel'] or c.state == 'draft' and c.kanban_state == 'done') and c.employee_id):
             domain = [
                 ('id', '!=', contract.id),
@@ -111,15 +112,16 @@ class Contract(models.Model):
                         ('state', '=', 'draft'),
                         ('kanban_state', '=', 'done') # replaces incoming
             ]
-
+            
             if not contract.date_end:
                 start_domain = []
                 end_domain = ['|', ('date_end', '>=', contract.date_start), ('date_end', '=', False)]
             else:
-                start_domain = [('date_start', '<=', contract.date_end)]
-                end_domain = ['|', ('date_end', '>', contract.date_start), ('date_end', '=', False)]
-
+                start_domain = [('date_start', '<', contract.date_end)]
+                end_domain = ['|', ('date_end', '>=', contract.date_start), ('date_end', '=', False)]
+                
             domain = expression.AND([domain, start_domain, end_domain])
+
             if self.search_count(domain):
                 raise ValidationError(_('An employee can only have one contract at the same time. (Excluding Draft and Cancelled contracts)'))
 
